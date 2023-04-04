@@ -3,17 +3,22 @@ package engine.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import engine.exception.QuizNotFoundException;
 import engine.exception.UserNotAuthorException;
+import engine.model.Completions;
 import engine.model.Quiz;
 import engine.model.UserAnswer;
+import engine.repo.CompletionsRepository;
 import engine.repo.QuizRepository;
 import engine.repo.UserRepository;
-import javassist.NotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.crossstore.ChangeSetPersister;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 
@@ -24,11 +29,15 @@ public class QuizService {
 
     private QuizRepository quizRepository;
     private UserRepository userRepository;
+    private CompletionsRepository completionsRepository;
 
     @Autowired
-    public QuizService(QuizRepository quizRepository, UserRepository userRepository) {
+    public QuizService(QuizRepository quizRepository,
+                       UserRepository userRepository,
+                       CompletionsRepository completionsRepository) {
         this.quizRepository = quizRepository;
         this.userRepository = userRepository;
+        this.completionsRepository = completionsRepository;
     }
 
 
@@ -49,13 +58,15 @@ public class QuizService {
         }
     }
 
-    public Reply checkAnswer(Long id, UserAnswer answer) {
+    public Reply checkAnswer(Long id, UserAnswer answer, String email) {
         Reply reply = new Reply();
 
         if (quizRepository.findById(id).isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         } else {
             if (valueOf(quizRepository.findById(id).get().getAnswer()).equals(valueOf(answer.getAnswer()))) {
+                LocalDateTime now = LocalDateTime.now();
+                completionsRepository.save(new Completions(email, id, now));
                 return new Reply(true, reply.CORRECT);
             } else {
                 return new Reply(false, reply.WRONG);
@@ -63,9 +74,10 @@ public class QuizService {
         }
     }
 
-    public String getAllQuizzes() {
+    public Page<Quiz> getAllQuizzes(int page) {
+        Pageable pageable = PageRequest.of(page, 10);
 
-        List<Quiz> allQuizes = new ArrayList<>();
+        /*List<Quiz> allQuizes = new ArrayList<>();
         quizRepository.findAll().forEach(allQuizes::add);
         String text = "[\n ";
         for (Quiz quiz : allQuizes) {
@@ -76,9 +88,9 @@ public class QuizService {
             }
         }
         text = text.replace("}{", "},\n {");
-        text += "\n]";
+        text += "\n]";*/
 
-        return text;
+        return quizRepository.findAll(pageable);
     }
 
     public void delete(Long id, String username) {
@@ -89,6 +101,11 @@ public class QuizService {
         } else {
             quizRepository.deleteById(id);
         }
+    }
 
+    public Page<Completions> getCompleted(int page, String userEmail) {
+        Pageable pageable = PageRequest.of(page, 10, Sort.by("completedAt").descending());
+        //return completionsRepository.findAll(pageable);
+        return completionsRepository.findAllByUserEmail(userEmail, pageable);
     }
 }

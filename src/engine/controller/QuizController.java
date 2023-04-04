@@ -2,12 +2,15 @@ package engine.controller;
 
 
 
+import engine.model.Completions;
 import engine.repo.UserRepository;
 import engine.service.QuizService;
 import engine.service.Reply;
 import engine.model.Quiz;
 import engine.model.UserAnswer;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -39,13 +42,15 @@ public class QuizController {
     }
 
     @GetMapping (path = "/api/quizzes")
-    public String getAllQuizzes() {
-        return quizService.getAllQuizzes();
+    public Page<Quiz> getAllQuizzes(@RequestParam int page) {
+
+        return quizService.getAllQuizzes(page);
     }
 
     @PostMapping (path = "/api/quizzes/{id}/solve")
-    public Reply answerQuiz(@PathVariable Long id, @RequestBody UserAnswer answer) {
-        return quizService.checkAnswer(id, answer);
+    public Reply answerQuiz(@PathVariable Long id, @RequestBody UserAnswer answer,
+                            @AuthenticationPrincipal UserDetails userDetails) {
+        return quizService.checkAnswer(id, answer, userDetails.getUsername());
     }
 
     @PostMapping (path = "/api/quizzes")
@@ -59,6 +64,12 @@ public class QuizController {
     public ResponseEntity<String> delete(@PathVariable Long id, Authentication auth) {
         quizService.delete(id, auth.getName());
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping(path = "/api/quizzes/completed")
+    public Page<Completions> getCompleted(@RequestParam int page,
+                                          @AuthenticationPrincipal UserDetails userDetails) {
+        return quizService.getCompleted(page, userDetails.getUsername());
     }
 
 
